@@ -276,12 +276,12 @@ export default function PedidosPage() {
                       .filter((s: any) => !busquedaProd || s.codigo.toLowerCase().includes(busquedaProd.toLowerCase()) || s.nombre.toLowerCase().includes(busquedaProd.toLowerCase()))
                       .slice(0, 10)
                       .map((s: any) => (
-                        <button key={s.productoId} onClick={() => addItem({ productoId: s.productoId, codigo: s.codigo, nombre: s.nombre, precioContado: 0 })} className="w-full text-left px-3 py-2 hover:bg-purple-50 flex justify-between text-sm">
+                        <button key={s.productoId} onClick={() => addItem({ productoId: s.productoId, codigo: s.codigo, nombre: s.nombre, precioContado: s.ultimoPrecioContado || 0 })} className="w-full text-left px-3 py-2 hover:bg-purple-50 flex justify-between text-sm">
                           <span>
                             <span className="font-mono text-xs">{s.codigo}</span> — {s.nombre}
                             <span className="text-xs text-gray-400 ml-2">disp: {s.stockDisponible}</span>
                           </span>
-                          <span className="text-purple-600 text-xs">Precio manual</span>
+                          <span className="text-purple-600 text-xs"><Money amount={s.ultimoPrecioContado || 0} /></span>
                         </button>
                       ))}
                   </div>

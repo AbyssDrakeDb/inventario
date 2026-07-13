@@ -39,11 +39,21 @@ export class ProductosService {
     marcaId: number; codigo: string; nombre: string; descripcion?: string;
     categoriaId?: number; presentacion?: string; stockMinimo?: number;
   }) {
+    const existente = await prisma.producto.findUnique({
+      where: { marcaId_codigo: { marcaId: data.marcaId, codigo: data.codigo } },
+    });
+    if (existente) throw new Error(`El código "${data.codigo}" ya existe en esta marca`);
     return prisma.producto.create({ data, include: { marca: true, categoria: true } });
   }
 
   async actualizar(id: number, data: any) {
-    await this.obtener(id);
+    const actual = await this.obtener(id);
+    if (data.codigo && data.codigo !== actual.codigo) {
+      const existente = await prisma.producto.findUnique({
+        where: { marcaId_codigo: { marcaId: actual.marcaId, codigo: data.codigo } },
+      });
+      if (existente) throw new Error(`El código "${data.codigo}" ya existe en esta marca`);
+    }
     return prisma.producto.update({ where: { id }, data, include: { marca: true, categoria: true, stockActual: true } });
   }
 

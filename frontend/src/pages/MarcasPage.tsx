@@ -9,7 +9,7 @@ export default function MarcasPage() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editando, setEditando] = useState<Marca | null>(null);
-  const [form, setForm] = useState({ nombre: '', slug: '', color: '' });
+  const [form, setForm] = useState({ nombre: '', slug: '', color: '', codigoPrefijo: '' });
 
   const { data: marcas, isLoading } = useQuery<Marca[]>({
     queryKey: ['marcas'],
@@ -33,11 +33,11 @@ export default function MarcasPage() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['marcas'] }); toast.success('Marca desactivada'); },
   });
 
-  const resetForm = () => setForm({ nombre: '', slug: '', color: '' });
+  const resetForm = () => setForm({ nombre: '', slug: '', color: '', codigoPrefijo: '' });
 
   const openEdit = (m: Marca) => {
     setEditando(m);
-    setForm({ nombre: m.nombre, slug: m.slug, color: m.color || '' });
+    setForm({ nombre: m.nombre, slug: m.slug, color: m.color || '', codigoPrefijo: m.codigoPrefijo || '' });
     setShowForm(true);
   };
 
@@ -64,9 +64,10 @@ export default function MarcasPage() {
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-white rounded-xl border p-4 space-y-3">
           <h3 className="font-semibold">{editando ? 'Editar marca' : 'Nueva marca'}</h3>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             <input placeholder="Nombre" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} required className="border rounded-lg px-3 py-2 text-sm" />
             <input placeholder="slug (ej. natura)" value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))} required pattern="[a-z0-9-]+" className="border rounded-lg px-3 py-2 text-sm" />
+            <input placeholder="Prefijo código (ej. NAT-)" value={form.codigoPrefijo} onChange={e => setForm(f => ({ ...f, codigoPrefijo: e.target.value }))} className="border rounded-lg px-3 py-2 text-sm" />
             <input placeholder="Color (hex)" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} className="border rounded-lg px-3 py-2 text-sm" />
           </div>
           <div className="flex gap-2">
@@ -83,6 +84,7 @@ export default function MarcasPage() {
               <th className="px-4 py-2 font-medium text-gray-600">Color</th>
               <th className="px-4 py-2 font-medium text-gray-600">Nombre</th>
               <th className="px-4 py-2 font-medium text-gray-600">Slug</th>
+              <th className="px-4 py-2 font-medium text-gray-600">Prefijo</th>
               <th className="px-4 py-2 font-medium text-gray-600">Estado</th>
               <th className="px-4 py-2 font-medium text-gray-600 w-20"></th>
             </tr>
@@ -93,6 +95,7 @@ export default function MarcasPage() {
                 <td className="px-4 py-2.5"><div className="w-5 h-5 rounded" style={{ backgroundColor: m.color || '#ccc' }} /></td>
                 <td className="px-4 py-2.5 font-medium">{m.nombre}</td>
                 <td className="px-4 py-2.5 text-gray-500">{m.slug}</td>
+                <td className="px-4 py-2.5"><code className="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded">{m.codigoPrefijo || '-'}</code></td>
                 <td className="px-4 py-2.5">{m.activa ? <span className="text-green-600 text-xs bg-green-50 px-2 py-0.5 rounded-full">Activa</span> : <span className="text-red-500 text-xs bg-red-50 px-2 py-0.5 rounded-full">Inactiva</span>}</td>
                 <td className="px-4 py-2.5">
                   <div className="flex gap-1">

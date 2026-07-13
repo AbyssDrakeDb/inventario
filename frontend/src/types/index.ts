@@ -3,6 +3,7 @@ export interface Marca {
   nombre: string;
   slug: string;
   color: string | null;
+  codigoPrefijo?: string;
   activa: boolean;
   createdAt: string;
 }
@@ -27,6 +28,7 @@ export interface Producto {
   marca?: Marca;
   categoria?: Categoria;
   stockActual?: StockActual;
+  alertarStockBajo?: boolean;
 }
 
 export interface Campana {
@@ -144,6 +146,8 @@ export interface StockVista {
   stockActual: number;
   stockComprometido: number;
   stockDisponible: number;
+  ultimoPrecioContado?: number;
+  ultimoPrecioRevendedora?: number;
 }
 
 export interface MovimientoInventario {

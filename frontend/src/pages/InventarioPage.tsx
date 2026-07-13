@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api/client';
 import type { StockVista, MovimientoInventario, Marca, Campana, Producto } from '../types';
@@ -73,10 +73,20 @@ export default function InventarioPage() {
     setShowMovForm(true);
   };
 
-  const selectProducto = (p: Producto) => {
+  const selectProducto = async (p: Producto) => {
     setProductoSeleccionado({ id: p.id, codigo: p.codigo, nombre: p.nombre });
     setMovForm(f => ({ ...f, productoId: p.id }));
     setBusquedaProducto('');
+    // Obtener último precio de campaña para pre-rellenar costo unitario
+    try {
+      const res = await api.get(`/inventario/stock/${p.id}`);
+      const precioRevendedora = res.data?.ultimoPrecioRevendedora || 0;
+      if (precioRevendedora > 0) {
+        setMovForm(f => ({ ...f, productoId: p.id, costoUnitario: String(precioRevendedora) }));
+      }
+    } catch {
+      // Si falla, se deja vacío
+    }
   };
 
   const tipoIcon = (tipo: string) => {

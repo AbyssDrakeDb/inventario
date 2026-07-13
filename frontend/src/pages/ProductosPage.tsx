@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api/client';
 import type { Producto, Marca, Categoria } from '../types';
@@ -15,6 +15,25 @@ export default function ProductosPage() {
     marcaId: 0, codigo: '', nombre: '', descripcion: '',
     categoriaId: 0, presentacion: '', stockMinimo: 0,
   });
+  const [codigoNumero, setCodigoNumero] = useState('');
+  const [codigoError, setCodigoError] = useState('');
+  const [codigoSugerido, setCodigoSugerido] = useState('');
+
+  // Obtener prefijo de código cuando se selecciona marca
+  const { data: nextCodeData, isFetching: codigoLoading } = useQuery<{ prefijo: string; codigo: string; siguiente: number }>({
+    queryKey: ['nextCode', form.marcaId],
+    queryFn: () => api.get(`/marcas/next-code/${form.marcaId}`).then(r => r.data),
+    enabled: form.marcaId > 0 && !editando,
+  });
+
+  // Cuando cambia el nextCode, sugerir el código
+  useEffect(() => {
+    if (nextCodeData && !editando) {
+      setCodigoNumero('');
+      setCodigoError('');
+      setCodigoSugerido(nextCodeData.codigo);
+    }
+  }, [nextCodeData, editando]);
 
   const { data: marcas } = useQuery<Marca[]>({ queryKey: ['marcas'], queryFn: () => api.get('/marcas').then(r => r.data) });
   const { data: categorias } = useQuery<Categoria[]>({ queryKey: ['categorias'], queryFn: () => api.get('/categorias').then(r => r.data) });
@@ -40,7 +59,32 @@ export default function ProductosPage() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['productos'] }); toast.success('Producto desactivado'); },
   });
 
-  const resetForm = () => setForm({ marcaId: 0, codigo: '', nombre: '', descripcion: '', categoriaId: 0, presentacion: '', stockMinimo: 0 });
+  const resetForm = () => {
+    setForm({ marcaId: 0, codigo: '', nombre: '', descripcion: '', categoriaId: 0, presentacion: '', stockMinimo: 0 });
+    setCodigoNumero('');
+    setCodigoError('');
+    setCodigoSugerido('');
+  };
+
+  // Validar código contra el backend
+  const validarCodigo = async (codigoCompleto: string) => {
+    if (!codigoCompleto || editando) return;
+    try {
+      const res = await api.get(`/productos/buscar/${form.marcaId}/${encodeURIComponent(codigoCompleto)}`);
+      if (res.status === 200) {
+        setCodigoError(`Código "${codigoCompleto}" ya está en uso.`);
+        if (nextCodeData?.siguiente) {
+          const sig = nextCodeData.siguiente;
+          setCodigoSugerido(`${nextCodeData.prefijo}${String(sig).padStart(3, '0')}`);
+        }
+        return false;
+      }
+    } catch {
+      setCodigoError('');
+      return true;
+    }
+    return true;
+  };
 
   const openEdit = (p: Producto) => {
     setEditando(p);
@@ -49,6 +93,9 @@ export default function ProductosPage() {
       descripcion: p.descripcion || '', categoriaId: p.categoriaId || 0,
       presentacion: p.presentacion || '', stockMinimo: p.stockMinimo,
     });
+    setCodigoNumero('');
+    setCodigoError('');
+    setCodigoSugerido('');
     setShowForm(true);
   };
 
@@ -85,11 +132,50 @@ export default function ProductosPage() {
         <form onSubmit={handleSubmit} className="bg-white rounded-xl border p-4 space-y-3">
           <h3 className="font-semibold">{editando ? 'Editar producto' : 'Nuevo producto'}</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <select value={form.marcaId} onChange={e => setForm(f => ({ ...f, marcaId: Number(e.target.value) }))} required className="border rounded-lg px-3 py-2 text-sm">
+            <select value={form.marcaId} onChange={e => { setForm(f => ({ ...f, marcaId: Number(e.target.value), codigo: '' })); setCodigoNumero(''); setCodigoError(''); setCodigoSugerido(''); }} required className="border rounded-lg px-3 py-2 text-sm">
               <option value={0}>Marca</option>
               {marcas?.filter(m => m.activa).map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
             </select>
-            <input placeholder="Código" value={form.codigo} onChange={e => setForm(f => ({ ...f, codigo: e.target.value }))} required className="border rounded-lg px-3 py-2 text-sm" />
+            {editando ? (
+              <input placeholder="Código" value={form.codigo} onChange={e => setForm(f => ({ ...f, codigo: e.target.value }))} required className="border rounded-lg px-3 py-2 text-sm" />
+            ) : (
+              <div>
+                <div className="flex border rounded-lg overflow-hidden">
+                  {nextCodeData?.prefijo ? (
+                    <span className="flex items-center px-2 bg-gray-100 text-gray-600 text-sm font-mono border-r">{nextCodeData.prefijo}</span>
+                  ) : null}
+                  <input
+                    placeholder={codigoSugerido ? `Ej: ${codigoSugerido.replace(nextCodeData?.prefijo || '', '')}` : 'Número'}
+                    value={codigoNumero}
+                    onChange={e => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      setCodigoNumero(val);
+                      const prefijo = nextCodeData?.prefijo || '';
+                      const codigoCompleto = prefijo + val;
+                      setForm(f => ({ ...f, codigo: codigoCompleto }));
+                      if (val.length >= 2) validarCodigo(codigoCompleto);
+                      else setCodigoError('');
+                    }}
+                    className="flex-1 px-3 py-2 text-sm outline-none min-w-0 w-20"
+                  />
+                  {codigoLoading && <span className="flex items-center px-2 text-gray-400 text-xs">Cargando...</span>}
+                </div>
+                {codigoError && (
+                  <div className="mt-1 flex items-center gap-1 text-xs">
+                    <span className="text-red-600">{codigoError}</span>
+                    {codigoSugerido && (
+                      <button type="button" onClick={() => {
+                        const prefijo = nextCodeData?.prefijo || '';
+                        const num = codigoSugerido.replace(prefijo, '');
+                        setCodigoNumero(num);
+                        setCodigoError('');
+                        setForm(f => ({ ...f, codigo: codigoSugerido }));
+                      }} className="text-blue-600 underline ml-1">Usar {codigoSugerido}</button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             <input placeholder="Nombre" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} required className="border rounded-lg px-3 py-2 text-sm" />
             <select value={form.categoriaId} onChange={e => setForm(f => ({ ...f, categoriaId: Number(e.target.value) }))} className="border rounded-lg px-3 py-2 text-sm">
               <option value={0}>Categoría</option>

@@ -5,6 +5,7 @@ export class InventarioService {
     const whereProducto: any = { activo: true };
     if (params.marcaId) whereProducto.marcaId = params.marcaId;
     if (params.categoriaId) whereProducto.categoriaId = params.categoriaId;
+    if (params.alerta) whereProducto.alertarStockBajo = true;
 
     const productos = await prisma.producto.findMany({
       where: whereProducto,
@@ -16,18 +17,34 @@ export class InventarioService {
       orderBy: [{ marcaId: 'asc' }, { codigo: 'asc' }],
     });
 
-    let result = productos.map(p => ({
-      productoId: p.id,
-      codigo: p.codigo,
-      nombre: p.nombre,
-      marca: p.marca.nombre,
-      categoria: p.categoria?.nombre,
-      presentacion: p.presentacion,
-      stockMinimo: p.stockMinimo,
-      stockActual: p.stockActual?.cantidad || 0,
-      stockComprometido: p.stockActual?.comprometida || 0,
-      stockDisponible: (p.stockActual?.cantidad || 0) - (p.stockActual?.comprometida || 0),
-    }));
+    // Obtener el último precio de campaña para cada producto
+    const preciosRecientes = await prisma.precioProducto.findMany({
+      where: { productoId: { in: productos.map(p => p.id) } },
+      orderBy: { campanaId: 'desc' },
+      distinct: ['productoId'],
+    });
+    const precioMap = new Map(preciosRecientes.map(p => [
+      p.productoId,
+      { precioContado: Number(p.precioContado), precioRevendedora: Number(p.precioRevendedora) },
+    ]));
+
+    let result = productos.map(p => {
+      const precios = precioMap.get(p.id);
+      return {
+        productoId: p.id,
+        codigo: p.codigo,
+        nombre: p.nombre,
+        marca: p.marca.nombre,
+        categoria: p.categoria?.nombre,
+        presentacion: p.presentacion,
+        stockMinimo: p.stockMinimo,
+        stockActual: p.stockActual?.cantidad || 0,
+        stockComprometido: p.stockActual?.comprometida || 0,
+        stockDisponible: (p.stockActual?.cantidad || 0) - (p.stockActual?.comprometida || 0),
+        ultimoPrecioContado: precios?.precioContado || 0,
+        ultimoPrecioRevendedora: precios?.precioRevendedora || 0,
+      };
+    });
 
     if (params.alerta) {
       result = result.filter(p => p.stockDisponible <= p.stockMinimo);
@@ -43,6 +60,11 @@ export class InventarioService {
     });
     if (!p) throw new Error('Producto no encontrado');
 
+    const ultimoPrecio = await prisma.precioProducto.findFirst({
+      where: { productoId },
+      orderBy: { campanaId: 'desc' },
+    });
+
     return {
       productoId: p.id,
       codigo: p.codigo,
@@ -52,6 +74,8 @@ export class InventarioService {
       stockActual: p.stockActual?.cantidad || 0,
       stockComprometido: p.stockActual?.comprometida || 0,
       stockDisponible: (p.stockActual?.cantidad || 0) - (p.stockActual?.comprometida || 0),
+      ultimoPrecioContado: ultimoPrecio ? Number(ultimoPrecio.precioContado) : 0,
+      ultimoPrecioRevendedora: ultimoPrecio ? Number(ultimoPrecio.precioRevendedora) : 0,
     };
   }
 

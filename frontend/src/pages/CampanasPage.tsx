@@ -4,12 +4,14 @@ import { Link } from 'react-router-dom';
 import api from '../api/client';
 import type { Campana, Marca } from '../types';
 import toast from 'react-hot-toast';
-import { Plus, BookOpen, Lock } from 'lucide-react';
+import { Plus, BookOpen, Lock, X } from 'lucide-react';
+import { Money } from '../components/Money';
 
 export default function CampanasPage() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [marcaFilter, setMarcaFilter] = useState<number | ''>('');
+  const [showCerrarModal, setShowCerrarModal] = useState<any>(null);
   const [form, setForm] = useState({
     marcaId: 0, numero: 0, nombre: '',
     fechaInicio: '', fechaFinVigencia: '', fechaPedidoMarca: '',
@@ -29,7 +31,8 @@ export default function CampanasPage() {
 
   const cerrarMutation = useMutation({
     mutationFn: (id: number) => api.post(`/campanas/${id}/cerrar`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['campanas'] }); toast.success('Campaña cerrada'); },
+    onSuccess: (res) => { queryClient.invalidateQueries({ queryKey: ['campanas'] }); setShowCerrarModal(res.data); },
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Error'),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -152,6 +155,54 @@ export default function CampanasPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Modal: Resultado de cierre de campaña — sobrantes */}
+      {showCerrarModal && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setShowCerrarModal(null)}>
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-auto space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-lg">Campaña cerrada ✓</h3>
+              <button onClick={() => setShowCerrarModal(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+
+            {showCerrarModal.sobrantes?.length > 0 ? (
+              <>
+                <p className="text-sm text-gray-600">
+                  Se encontraron <strong>{showCerrarModal.totalSobrante}</strong> unidades sobrantes que puedes vender como venta directa.
+                </p>
+                <table className="w-full text-sm border rounded-lg">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-1.5 text-left text-xs">Código</th>
+                      <th className="px-3 py-1.5 text-left text-xs">Producto</th>
+                      <th className="px-3 py-1.5 text-right text-xs">Pedido clientes</th>
+                      <th className="px-3 py-1.5 text-right text-xs">Recibido</th>
+                      <th className="px-3 py-1.5 text-right text-xs font-bold text-green-600">Sobrante</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {showCerrarModal.sobrantes.map((s: any, i: number) => (
+                      <tr key={i} className="border-t">
+                        <td className="px-3 py-1.5 font-mono text-xs">{s.codigo}</td>
+                        <td className="px-3 py-1.5 text-xs">{s.nombre}</td>
+                        <td className="px-3 py-1.5 text-right text-xs">{s.totalPedidoClientes}</td>
+                        <td className="px-3 py-1.5 text-right text-xs">{s.totalRecibido}</td>
+                        <td className="px-3 py-1.5 text-right text-xs font-bold text-green-600">{s.sobrante}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            ) : (
+              <p className="text-sm text-gray-500">No hay productos sobrantes. Todo lo recibido fue pedido por clientes.</p>
+            )}
+
+            <div className="flex justify-end">
+              <button onClick={() => setShowCerrarModal(null)} className="bg-gray-100 px-4 py-2 rounded-lg text-sm hover:bg-gray-200">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

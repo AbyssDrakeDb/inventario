@@ -12,6 +12,7 @@ model Marca {
   nombre    String     @db.VarChar(100)
   slug      String     @unique @db.VarChar(100)
   color     String?    @db.VarChar(20)
+  codigoPrefijo String? @map("codigo_prefijo") @db.VarChar(10)
   activa    Boolean    @default(true)
   createdAt DateTime   @default(now()) @map("created_at")
   updatedAt DateTime   @updatedAt @map("updated_at")
@@ -46,6 +47,7 @@ model Producto {
   presentacion  String?  @db.VarChar(200)
   stockMinimo   Int      @default(0) @map("stock_minimo")
   activo        Boolean  @default(true)
+  alertarStockBajo Boolean @default(true) @map("alertar_stock_bajo")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 

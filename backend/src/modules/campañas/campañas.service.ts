@@ -90,6 +90,14 @@ export class CampanasService {
     // Cerrar campaña
     await prisma.campana.update({ where: { id }, data: { estado: 'cerrada' } });
 
+    // Desactivar alertas de stock bajo para productos sobrantes
+    if (sobrantes.length > 0) {
+      await prisma.producto.updateMany({
+        where: { id: { in: sobrantes.map(s => s.productoId) } },
+        data: { alertarStockBajo: false },
+      });
+    }
+
     return {
       ok: true,
       estado: 'cerrada',

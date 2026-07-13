@@ -24,6 +24,22 @@ export class MarcasService {
     await this.obtener(id);
     return prisma.marca.update({ where: { id }, data: { activa: false } });
   }
+
+  async nextCode(id: number) {
+    const marca = await this.obtener(id);
+    const prefijo = marca.codigoPrefijo || '';
+    const ultimo = await prisma.producto.findFirst({
+      where: { marcaId: id, codigo: { startsWith: prefijo } },
+      orderBy: { codigo: 'desc' },
+      select: { codigo: true },
+    });
+    let sig = 1;
+    if (ultimo) {
+      const n = parseInt(ultimo.codigo.replace(prefijo, ''), 10);
+      if (!isNaN(n)) sig = n + 1;
+    }
+    return { prefijo, codigo: `${prefijo}${String(sig).padStart(3, '0')}`, siguiente: sig };
+  }
 }
 
 export const marcasService = new MarcasService();

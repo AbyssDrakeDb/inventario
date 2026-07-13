@@ -11,12 +11,14 @@ const marcaSchema = z.object({
   nombre: z.string().min(2),
   slug: z.string().min(2).regex(/^[a-z0-9-]+$/, 'Slug debe ser alfanumérico con guiones'),
   color: z.string().optional(),
+  codigoPrefijo: z.string().optional(),
 });
 
 const marcaUpdateSchema = z.object({
   nombre: z.string().min(2).optional(),
   slug: z.string().min(2).regex(/^[a-z0-9-]+$/, 'Slug inválido').optional(),
   color: z.string().optional(),
+  codigoPrefijo: z.string().optional(),
   activa: z.boolean().optional(),
 });
 
@@ -26,6 +28,15 @@ marcasRouter.get('/', async (_req, res) => {
     res.json(marcas);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+marcasRouter.get('/next-code/:marcaId', async (req, res) => {
+  try {
+    const result = await marcasService.nextCode(Number(req.params.marcaId));
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
   }
 });
 
