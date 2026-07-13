@@ -1,0 +1,264 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Marca {
+  id        Int        @id @default(autoincrement())
+  nombre    String     @db.VarChar(100)
+  slug      String     @unique @db.VarChar(100)
+  color     String?    @db.VarChar(20)
+  activa    Boolean    @default(true)
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  productos  Producto[]
+  campanas   Campana[]
+  categorias Categoria[]
+
+  @@map("marcas")
+}
+
+model Categoria {
+  id        Int        @id @default(autoincrement())
+  nombre    String     @db.VarChar(100)
+  marcaId   Int?       @map("marca_id")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  marca      Marca?     @relation(fields: [marcaId], references: [id])
+  productos  Producto[]
+
+  @@map("categorias")
+}
+
+model Producto {
+  id            Int      @id @default(autoincrement())
+  marcaId       Int      @map("marca_id")
+  codigo        String   @db.VarChar(50)
+  nombre        String   @db.VarChar(200)
+  descripcion   String?  @db.Text
+  categoriaId   Int?     @map("categoria_id")
+  presentacion  String?  @db.VarChar(200)
+  stockMinimo   Int      @default(0) @map("stock_minimo")
+  activo        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  marca         Marca        @relation(fields: [marcaId], references: [id])
+  categoria     Categoria?   @relation(fields: [categoriaId], references: [id])
+  precios       PrecioProducto[]
+  pedidoItems   PedidoItem[]
+  movimientos   MovimientoInventario[]
+  stockActual   StockActual?
+  pedidoMarcaItems PedidoMarcaItem[]
+
+  @@unique([marcaId, codigo])
+  @@map("productos")
+}
+
+model Campana {
+  id              Int      @id @default(autoincrement())
+  marcaId         Int      @map("marca_id")
+  numero          Int
+  nombre          String?  @db.VarChar(200)
+  fechaInicio     DateTime @map("fecha_inicio")
+  fechaFinVigencia DateTime @map("fecha_fin_vigencia")
+  fechaPedidoMarca DateTime? @map("fecha_pedido_marca")
+  estado          String   @default("abierta") @db.VarChar(20)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  marca          Marca          @relation(fields: [marcaId], references: [id])
+  precios        PrecioProducto[]
+  pedidos        Pedido[]
+  pedidoMarcas   PedidoMarca[]
+  movimientos    MovimientoInventario[]
+
+  @@unique([marcaId, numero])
+  @@map("campanas")
+}
+
+model PrecioProducto {
+  id                Int      @id @default(autoincrement())
+  productoId        Int      @map("producto_id")
+  campanaId         Int      @map("campana_id")
+  precioContado     Decimal  @map("precio_contado") @db.Decimal(10, 2)
+  precioRevendedora Decimal  @map("precio_revendedora") @db.Decimal(10, 2)
+  precioCredito     Decimal? @map("precio_credito") @db.Decimal(10, 2)
+  precioOferta      Decimal? @map("precio_oferta") @db.Decimal(10, 2)
+  esOferta          Boolean  @default(false) @map("es_oferta")
+  bonificacion      Decimal? @db.Decimal(10, 2)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  producto  Producto @relation(fields: [productoId], references: [id])
+  campana   Campana  @relation(fields: [campanaId], references: [id])
+
+  @@unique([productoId, campanaId])
+  @@map("precios_producto")
+}
+
+model Cliente {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @db.VarChar(200)
+  telefono  String?  @db.VarChar(50)
+  direccion String?  @db.Text
+  ciudad    String?  @db.VarChar(100)
+  notas     String?  @db.Text
+  saldo     Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  pedidos Pedido[]
+  pagos   Pago[]
+
+  @@map("clientes")
+}
+
+model Pedido {
+  id               Int      @id @default(autoincrement())
+  clienteId        Int      @map("cliente_id")
+  campanaId        Int      @map("campana_id")
+  fecha            DateTime @default(now())
+  estado           String   @default("borrador") @db.VarChar(30)
+  totalContado     Decimal  @default(0) @map("total_contado") @db.Decimal(10, 2)
+  totalRevendedora Decimal  @default(0) @map("total_revendedora") @db.Decimal(10, 2)
+  ganancia         Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  cliente    Cliente                @relation(fields: [clienteId], references: [id])
+  campana    Campana                @relation(fields: [campanaId], references: [id])
+  items      PedidoItem[]
+  pagos      Pago[]
+  movimientos MovimientoInventario[]
+
+  @@map("pedidos")
+}
+
+model PedidoItem {
+  id                    Int      @id @default(autoincrement())
+  pedidoId              Int      @map("pedido_id")
+  productoId            Int      @map("producto_id")
+  cantidad              Int
+  cantidadEntregada     Int      @default(0) @map("cantidad_entregada")
+  cantidadFaltante      Int      @default(0) @map("cantidad_faltante")
+  precioContadoUnit     Decimal  @map("precio_contado_unit") @db.Decimal(10, 2)
+  precioRevendedoraUnit Decimal  @map("precio_revendedora_unit") @db.Decimal(10, 2)
+  subtotalContado       Decimal  @map("subtotal_contado") @db.Decimal(10, 2)
+  subtotalRevendedora   Decimal  @map("subtotal_revendedora") @db.Decimal(10, 2)
+  estadoItem            String   @default("esperando") @map("estado_item") @db.VarChar(20)
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  pedido   Pedido   @relation(fields: [pedidoId], references: [id])
+  producto Producto @relation(fields: [productoId], references: [id])
+
+  @@map("pedido_items")
+}
+
+model MovimientoInventario {
+  id            Int      @id @default(autoincrement())
+  productoId    Int      @map("producto_id")
+  tipo          String   @db.VarChar(30)
+  cantidad      Int
+  costoUnitario Decimal? @map("costo_unitario") @db.Decimal(10, 2)
+  motivo        String?  @db.Text
+  fecha         DateTime @default(now())
+  pedidoId      Int?     @map("pedido_id")
+  campanaId     Int?     @map("campana_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  producto Producto @relation(fields: [productoId], references: [id])
+  pedido   Pedido?  @relation(fields: [pedidoId], references: [id])
+  campana  Campana? @relation(fields: [campanaId], references: [id])
+
+  @@map("movimientos_inventario")
+}
+
+model StockActual {
+  productoId   Int      @id @map("producto_id")
+  cantidad     Int      @default(0)
+  comprometida Int      @default(0)
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  producto Producto @relation(fields: [productoId], references: [id])
+
+  @@map("stock_actual")
+}
+
+model PedidoMarca {
+  id              Int      @id @default(autoincrement())
+  campanaId       Int      @map("campana_id")
+  fechaEnvio      DateTime @default(now()) @map("fecha_envio")
+  estado          String   @default("pendiente") @db.VarChar(20)
+  totalRevendedora Decimal @default(0) @map("total_revendedora") @db.Decimal(10, 2)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  campana Campana           @relation(fields: [campanaId], references: [id])
+  items   PedidoMarcaItem[]
+
+  @@map("pedidos_marca")
+}
+
+model PedidoMarcaItem {
+  id              Int    @id @default(autoincrement())
+  pedidoMarcaId   Int    @map("pedido_marca_id")
+  productoId      Int    @map("producto_id")
+  cantidadPedida  Int    @map("cantidad_pedida")
+  cantidadRecibida Int   @default(0) @map("cantidad_recibida")
+
+  pedidoMarca PedidoMarca @relation(fields: [pedidoMarcaId], references: [id])
+  producto    Producto    @relation(fields: [productoId], references: [id])
+
+  @@map("pedido_marca_items")
+}
+
+model Pago {
+  id        Int      @id @default(autoincrement())
+  clienteId Int      @map("cliente_id")
+  pedidoId  Int?     @map("pedido_id")
+  fecha     DateTime @default(now())
+  monto     Decimal  @db.Decimal(10, 2)
+  tipo      String   @db.VarChar(20)
+  notas     String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  cliente Cliente @relation(fields: [clienteId], references: [id])
+  pedido  Pedido? @relation(fields: [pedidoId], references: [id])
+
+  @@map("pagos")
+}
+
+model Usuario {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @db.VarChar(100)
+  email     String   @unique @db.VarChar(100)
+  password  String   @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  configuraciones Configuracion[]
+
+  @@map("usuarios")
+}
+
+model Configuracion {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int      @unique @map("usuario_id")
+  monedaSimbolo String @default("S/") @map("moneda_simbolo") @db.VarChar(10)
+  monedaDecimales Int @default(2) @map("moneda_decimales")
+  pais      String   @default("PE") @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@map("configuraciones")
+}
